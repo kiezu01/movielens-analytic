@@ -1,0 +1,69 @@
+// Import rating into RDD
+val ratingsRDD = sc.textFile("D:/Github/MovieLens-Analytics/ml-25m/ratings.csv") // load data ratings
+val ratingsheader = ratingsRDD.first() // first row is header
+val ratingsDataRDD = ratingsRDD.filter(line => line != ratingsheader) // remove header
+
+// Import movie into RDD
+val moviesRDD = sc.textFile("D:/Github/MovieLens-Analytics/ml-25m/movies.csv") // load data movies
+val moviesHeader = moviesRDD.first() // first row is header
+val moviesDataRDD = moviesRDD.filter(line => line != moviesHeader) // remove header
+
+// Calculate sum of ratings
+val totalRatings = ratingsDataRDD.count()
+println("Total of ratings: " + totalRatings)
+
+// Calculate sum of movies
+val totalMovies = moviesDataRDD.count()
+println("Total of movies: " + totalMovies)
+
+// Calculate sum of users evaluate
+val totalUsers = ratingsDataRDD.map(line => line.split(",")(0)).distinct().count()
+println("Total users evaluate: " + totalUsers)
+
+// Calculate sum of movies rated
+val totalMoviesRated = ratingsDataRDD.map(line => line.split(",")(1)).distinct().count()
+println("Total of movies rated: " + totalMoviesRated)
+
+// Calculate the ratio of the number of movies rated to the total number of movies
+val ratedMoviesRatio = (totalMoviesRated.toDouble / totalMovies) * 100
+println("The ratio of the number of movies rated: " + ratedMoviesRatio + "%")
+
+// Calculate the total number of reviews by rating score
+val ratingCounts = ratingsDataRDD.map(line => line.split(",")(2)).countByValue()
+ratingCounts.foreach { case (score, count) =>
+  println("The total number of reviews by rating score " + score + ": " + count)
+}
+
+// Calculate the ratio of the number of users who have rated the movie to the total number of users
+val usersWithRatings = ratingsDataRDD.map(line => line.split(",")(0)).distinct().count()
+val userRatingRatio = (usersWithRatings.toDouble / totalUsers) * 100
+println("The ratio of the number of users who have rated the movie: " + userRatingRatio + "%")
+
+
+// top 10 highest rated movies
+val movieRatingsRDD = ratingsDataRDD.map(line => (line.split(",")(1), line.split(",")(2).toDouble))
+val totalRatingsByMovie = movieRatingsRDD.reduceByKey((rating1, rating2) => rating1 + rating2)
+val sortedMovies = totalRatingsByMovie.sortBy(_._2, false)
+val top10Movies = sortedMovies.take(10)
+top10Movies.foreach { case (movieId, totalRating) =>
+  val movieTitle = moviesDataRDD.filter(line => line.split(",")(0) == movieId).first().split(",")(1)
+  val roundedRating = totalRating.round
+  println("Movie: " + movieTitle + ", Rated: " + roundedRating)
+}
+
+//The 10 movies with the highest rating are the 5 with the most reviews
+val movieRatingsRDD = ratingsDataRDD.map(line => (line.split(",")(1), line.split(",")(2).toDouble))
+val filteredRatingsRDD = movieRatingsRDD.filter { case (_, rating) => rating == 5.0 }
+val totalRatingsByMovie = filteredRatingsRDD.mapValues(_ => 1).reduceByKey(_ + _)
+val sortedMovies = totalRatingsByMovie.sortBy(_._2, false)
+val top10Movies = sortedMovies.take(10)
+top10Movies.foreach { case (movieId, ratingCount) =>
+  val movieTitle = moviesDataRDD.filter(line => line.split(",")(0) == movieId).first().split(",")(1)
+  println("Movies: " + movieTitle + ", rated: " + ratingCount)
+}
+
+// distribution of ratings
+val ratings = ratingsDataRDD.map(line => line.split(",")(2).toDouble)
+val customBins = Array(0.0, 1.0, 2.0, 3.0, 4.0, 5.0)
+val ratingHistogram = ratings.histogram(customBins)
+
